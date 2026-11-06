@@ -1,0 +1,9 @@
+# (the Dockerfile, ECS task definition and ALB target group all use 8080).
+server:
+  port: 8080
+  # Finish in-flight requests before stopping, so ECS deployments don't drop requests
+  shutdown: graceful
+
+spring:
+  application:
+    name: app
