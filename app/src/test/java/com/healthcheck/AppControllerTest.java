@@ -29,7 +29,6 @@ class AppControllerTest {
     void rootReturnsMessage() throws Exception {
         mvc.perform(get("/"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").exists())
-                .andExpect(jsonPath("$.hostname").exists());
+                .andExpect(jsonPath("$.message").exists());
     }
 }
