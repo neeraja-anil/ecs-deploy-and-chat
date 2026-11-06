@@ -1,0 +1,7 @@
+# Files Docker should NOT copy into the build (keeps builds clean and fast).
+target/
+.idea/
+.vscode/
+*.iml
+Dockerfile
+.dockerignore
