@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ECS Service Chat</title>
+  <style>
+    :root {
+      --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #667085; --border: #dfe3ea;
+      --user: #2f5bea; --user-text: #ffffff;
+      --success: #e7f6ec; --success-border: #3a9d5d;
+      --info: #eaf1fd; --info-border: #3b6fd8;
+      --unclear: #fff5e0; --unclear-border: #d29a1e;
+      --error: #fdecec; --error-border: #d14343;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #12151b; --panel: #1b1f27; --text: #e6e9ef; --muted: #98a2b3; --border: #2c323d;
+        --user: #3d6af2; --user-text: #ffffff;
+        --success: #15291d; --info: #16213a; --unclear: #2e2614; --error: #331a1a;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--bg); color: var(--text);
+      display: flex; flex-direction: column; height: 100vh;
+    }
+    header { padding: 16px 20px; border-bottom: 1px solid var(--border); background: var(--panel); }
+    header h1 { margin: 0; font-size: 18px; }
+    header p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+    #log { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+    .msg {
+      max-width: 720px; padding: 10px 14px; border-radius: 10px;
+      white-space: pre-line; line-height: 1.45; font-size: 15px;
+    }
+    .user { align-self: flex-end; background: var(--user); color: var(--user-text); }
+    .bot { align-self: flex-start; background: var(--panel); border: 1px solid var(--border); border-left-width: 4px; }
+    .success { background: var(--success); border-left-color: var(--success-border); }
+    .info    { background: var(--info);    border-left-color: var(--info-border); }
+    .unclear { background: var(--unclear); border-left-color: var(--unclear-border); }
+    .error   { background: var(--error);   border-left-color: var(--error-border); }
+    .pending { color: var(--muted); font-style: italic; }
+    #examples { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 20px 10px; }
+    #examples button {
+      border: 1px solid var(--border); background: var(--panel); color: var(--text);
+      border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer;
+    }
+    form { display: flex; gap: 8px; padding: 12px 20px 20px; border-top: 1px solid var(--border); background: var(--panel); }
+    input {
+      flex: 1; padding: 10px 12px; font-size: 15px; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--bg); color: var(--text);
+    }
+    form button {
+      padding: 10px 18px; font-size: 15px; border: 0; border-radius: 8px;
+      background: var(--user); color: var(--user-text); cursor: pointer;
+    }
+    button:disabled, input:disabled { opacity: 0.6; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ECS Service Chat</h1>
+    <p>Type a change in plain English. It is applied to the running ECS service; changes take about 1–3 minutes.</p>
+  </header>
+
+  <div id="log" aria-live="polite"></div>
+
+  <div id="examples">
+    <button type="button">what's running?</button>
+    <button type="button">scale to 2</button>
+    <button type="button">set APP_MESSAGE to Good morning</button>
+    <button type="button">use 0.5 vCPU and 1 GB memory</button>
+    <button type="button">deploy image tag v1</button>
+  </div>
+
+  <form id="form">
+    <input id="input" autocomplete="off" maxlength="500" placeholder="e.g. scale to 2" autofocus>
+    <button id="send" type="submit">Send</button>
+  </form>
+
+  <script>
+    const log = document.getElementById('log');
+    const form = document.getElementById('form');
+    const input = document.getElementById('input');
+    const send = document.getElementById('send');
+
+    // Adds a message bubble. textContent (not innerHTML) so replies can never inject HTML.
+    function addMessage(text, classes) {
+      const div = document.createElement('div');
+      div.className = 'msg ' + classes;
+      div.textContent = text;
+      log.appendChild(div);
+      log.scrollTop = log.scrollHeight;
+      return div;
+    }
+
+    function setBusy(busy) {
+      input.disabled = busy;
+      send.disabled = busy;
+      document.querySelectorAll('#examples button').forEach(b => b.disabled = busy);
+    }
+
+    async function sendMessage(text) {
+      addMessage(text, 'user');
+      setBusy(true);
+
+      // Show a "working" bubble with a timer, since changes wait for ECS to finish.
+      const pending = addMessage('Working…', 'bot pending');
+      const started = Date.now();
+      const timer = setInterval(() => {
+        const s = Math.round((Date.now() - started) / 1000);
+        pending.textContent = `Working… ${s}s (waiting for ECS to finish the change)`;
+      }, 1000);
+
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text })
+        });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const reply = await response.json();
+        pending.remove();
+        addMessage(reply.text, 'bot ' + reply.type);
+      } catch (err) {
+        pending.remove();
+        addMessage('Could not reach the chat backend (' + err.message + '). Is it still running?', 'bot error');
+      } finally {
+        clearInterval(timer);
+        setBusy(false);
+        input.focus();
+      }
+    }
+
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = '';
+      sendMessage(text);
+    });
+
+    document.querySelectorAll('#examples button').forEach(button =>
+      button.addEventListener('click', () => sendMessage(button.textContent)));
+
+    addMessage('Hi! Tell me what to change on the service, or ask "what\'s running?".', 'bot info');
+  </script>
+</body>
+</html>
