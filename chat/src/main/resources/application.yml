@@ -1,0 +1,19 @@
+# Chat app settings. Each ${NAME:default} can be overridden with an environment variable.
+
+server:
+  port: ${PORT:8090}
+
+# Which ECS service to control: must match the Terraform outputs (cluster_name, service_name).
+ecs:
+  region: ${AWS_REGION:ap-south-1}
+  cluster: ${ECS_CLUSTER:ecs-health-check-app}
+  service: ${ECS_SERVICE:ecs-health-check-app}
+  # How long to wait for ECS to finish a change before reporting a timeout
+  wait-timeout-minutes: 10
+  # Highest task count the chat may scale to (limits cost and mistakes)
+  max-tasks: ${ECS_MAX_TASKS:5}
+
+# The API key is NOT here: it is read from the OPENAI_API_KEY environment variable.
+# Any OpenAI model that supports structured outputs works; override with OPENAI_MODEL.
+openai:
+  model: ${OPENAI_MODEL:gpt-4o-mini}

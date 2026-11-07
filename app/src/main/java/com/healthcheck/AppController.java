@@ -23,36 +23,12 @@ public class AppController {
     }
 
     /**
-     * Shows the current configuration so changes made through the chat are visible:
+     * Status page, so changes to the running service are visible:
      *  - message:  from env var APP_MESSAGE
-     *  - hostname: differs per container, so after scaling up, refreshing
-     *              shows requests landing on different containers
-     *  - config:   every env var starting with APP_
      */
     @GetMapping("/")
-    public Map<String, Object> info() {
-        Map<String, Object> body = new HashMap<>();
-        body.put("message", System.getenv().getOrDefault("APP_MESSAGE", "Hi, Welcome!"));
-        body.put("hostname", hostname());
-        body.put("config", appEnvVars());
+    public Map<String, String> info() {
+        Map<String, String> body = Map.of("message", System.getenv().getOrDefault("APP_MESSAGE", "Hi, Welcome!"));
         return body;
-    }
-
-    private static Map<String, String> appEnvVars() {
-        Map<String, String> vars = new HashMap<>();
-        for (Map.Entry<String, String> entry : System.getenv().entrySet()) {
-            if (entry.getKey().startsWith("APP_")) {
-                vars.put(entry.getKey(), entry.getValue());
-            }
-        }
-        return vars;
-    }
-
-    private static String hostname() {
-        try {
-            return InetAddress.getLocalHost().getHostName();
-        } catch (Exception e) {
-            return "unknown";
-        }
     }
 }
